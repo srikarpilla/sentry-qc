@@ -1,5 +1,5 @@
 """
-app.py — Hugging Face Spaces entry point
+app.py — Hugging Face Spaces entry point (CPU basic)
 Mounts the Sentry QC FastAPI app inside a minimal Gradio 6 shell.
 The full custom frontend is served at the root URL (/).
 """
@@ -8,18 +8,17 @@ import uvicorn
 
 from app.main import app as fastapi_app
 
-# Minimal Gradio interface — required so HF Spaces detects a valid Gradio app
+# Minimal Gradio interface mounted at /gradio
+# FastAPI handles everything else: /, /predict, /health, /docs
 with gr.Blocks(title="Sentry QC") as demo:
     gr.Markdown(
         """
         # 🛡️ Sentry QC — Automated Visual Inspection
-        The full web application is running at the **root URL [`/`](/)**.
-
-        You can also explore the API at [`/docs`](/docs).
+        The full web application is running at **[/](/)**.
+        API docs are available at **[/docs](/docs)**.
         """
     )
 
-# Mount Gradio at /gradio; FastAPI handles /, /predict, /health, etc.
 app = gr.mount_gradio_app(fastapi_app, demo, path="/gradio")
 
 if __name__ == "__main__":
