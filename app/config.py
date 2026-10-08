@@ -1,4 +1,4 @@
-﻿"""
+"""
 app/config.py
 ─────────────
 All tunable knobs live here. Read from environment variables with sensible
@@ -15,7 +15,11 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     # Paths
-    model_path: str = os.path.join("outputs", "final_model.keras")
+    model_path: str = (
+        os.path.join("outputs", "model.tflite")
+        if os.path.exists(os.path.join("outputs", "model.tflite"))
+        else os.path.join("outputs", "final_model.keras")
+    )
     class_names_path: str = os.path.join("outputs", "class_names.json")
     threshold_path: str = os.path.join("outputs", "threshold.json")
 

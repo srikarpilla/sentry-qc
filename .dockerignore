@@ -1,0 +1,17 @@
+venv/
+myenv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+.git/
+*.bak
+*.backup_before_demo
+New Text Document.txt
+rag_kb/
+demo_images/
+demo_images_meta.json
+diagnose_weights.py
+test_api.py
+tests/
+scripts/

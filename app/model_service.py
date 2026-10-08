@@ -1,4 +1,4 @@
-﻿"""
+"""
 app/model_service.py
 ────────────────────
 Loads the Keras model once at startup and exposes predict() / predict_batch().
@@ -34,6 +34,9 @@ logger = logging.getLogger(__name__)
 
 # ── Module-level singletons ────────────────────────────────────────────────────
 _model: keras.Model | None = None
+_interpreter: Any | None = None
+_in_details: Any | None = None
+_out_details: Any | None = None
 _class_names: list[str] = []
 _threshold: float = 0.58
 _uncertain_band: float = 0.10
@@ -45,7 +48,8 @@ def load_model(settings: Any) -> None:
     Load model + companion files.  Called once from the lifespan event.
     Fails fast with a clear message if any file is missing.
     """
-    global _model, _class_names, _threshold, _uncertain_band, _model_path
+    global _model, _interpreter, _in_details, _out_details
+    global _class_names, _threshold, _uncertain_band, _model_path
 
     # ── Resolve paths ──────────────────────────────────────────────────────────
     model_path = settings.model_path
@@ -75,26 +79,33 @@ def load_model(settings: Any) -> None:
     logger.info("Threshold loaded: %.4f (positive_class=%s)", _threshold, thresh_data.get("positive_class"))
 
     # ── Load model ─────────────────────────────────────────────────────────────
-    logger.info("Loading model from '%s' ...", model_path)
-    _model = keras.models.load_model(model_path)
     _model_path = model_path
-    logger.info(
-        "Model loaded — input: %s  output: %s",
-        _model.input_shape,
-        _model.output_shape,
-    )
+    logger.info("Loading model from '%s' ...", model_path)
+    if model_path.endswith(".tflite"):
+        _interpreter = tf.lite.Interpreter(model_path=model_path)
+        _interpreter.allocate_tensors()
+        _in_details = _interpreter.get_input_details()
+        _out_details = _interpreter.get_output_details()
+        logger.info("TFLite model loaded successfully.")
+    else:
+        _model = keras.models.load_model(model_path)
+        logger.info(
+            "Keras model loaded — input: %s  output: %s",
+            _model.input_shape,
+            _model.output_shape,
+        )
 
     # ── Uncertain band ─────────────────────────────────────────────────────────
     _uncertain_band = settings.uncertain_band
 
     # ── Warm-up run ────────────────────────────────────────────────────────────
     dummy = np.zeros((1, settings.img_height, settings.img_width, 3), dtype=np.float32)
-    _ = _model(dummy, training=False)
+    _ = _run_inference(dummy)
     logger.info("Model warm-up complete.")
 
 
 def is_loaded() -> bool:
-    return _model is not None
+    return _interpreter is not None or _model is not None
 
 
 def get_class_names() -> list[str]:
@@ -110,9 +121,19 @@ def get_model_path() -> str:
 
 
 def _run_inference(batch: np.ndarray) -> np.ndarray:
-    """Run model forward pass (training=False). Returns numpy array."""
-    preds = _model(batch, training=False)  # type: ignore[index]
-    return preds.numpy()
+    """Run model forward pass. Returns numpy array of shape (N, 2)."""
+    if _interpreter is not None:
+        preds = []
+        for i in range(len(batch)):
+            sample = np.expand_dims(batch[i], axis=0)
+            _interpreter.set_tensor(_in_details[0]["index"], sample)
+            _interpreter.invoke()
+            preds.append(_interpreter.get_tensor(_out_details[0]["index"])[0])
+        return np.array(preds, dtype=np.float32)
+    elif _model is not None:
+        preds = _model(batch, training=False)
+        return preds.numpy()
+    raise RuntimeError("No model loaded")
 
 
 def _apply_threshold(p_good: float) -> tuple[str, str]:
@@ -142,7 +163,7 @@ def predict_single(
     -------
     dict matching PredictionResult schema
     """
-    assert _model is not None, "Model not loaded"
+    assert is_loaded(), "Model not loaded"
 
     # ── Preprocess ─────────────────────────────────────────────────────────────
     batch = preprocess_image_bytes(image_bytes, use_tta=use_tta)

@@ -4,3 +4,14 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .env
+*.bak
+*.backup_before_demo
+"New Text Document.txt"
+demo_images/
+rag_kb/
+scripts/
+diagnose_weights.py
+New Text Document.txt
+/final_model.keras
+/class_names.json
+/threshold.json

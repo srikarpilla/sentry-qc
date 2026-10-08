@@ -1,20 +1,21 @@
 # Sentry QC — Backend dependencies
 # Python 3.10+ required
 
-# Core framework — versions loosened to be compatible with Hugging Face Gradio 6
-fastapi>=0.115.2
+# Core framework
+fastapi>=0.115.0
 uvicorn[standard]>=0.32.0
 python-multipart>=0.0.12
 
 # ML
-tensorflow==2.21.0
-# keras 3.12.4 ships with TF 2.21 — do not pin keras separately
+tensorflow-cpu>=2.15.0; platform_system != 'Windows'
+tensorflow==2.21.0; platform_system == 'Windows'
+# keras 3.12.4 ships with TF 2.21
 
 # Image processing
 pillow>=10.4.0
 
-# Pydantic + settings — loosened so pip can satisfy gradio[mcp] requirement
-pydantic>=2.11.10,<=2.12.5
+# Pydantic + settings
+pydantic>=2.9.2
 pydantic-settings>=2.5.2
 
 # Numeric
